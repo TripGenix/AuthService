@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 public class Tourist {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY) // 👈 AUTO_INCREMENT
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "tourist_id")
     private Integer touristId;
 

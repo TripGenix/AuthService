@@ -1,56 +1,61 @@
 package com.tripgenix.AuthService.services;
 
-
 import com.tripgenix.AuthService.dto.TouristDto;
 import com.tripgenix.AuthService.dto.TouristResponseDto;
 import com.tripgenix.AuthService.model.Tourist;
 import com.tripgenix.AuthService.repo.TouristRepository;
-import jakarta.transaction.Transactional;
 import org.modelmapper.ModelMapper;
-import org.modelmapper.TypeToken;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
-@Transactional
-public class TouristService {
-    @Autowired
-    private TouristRepository userRepository;
+public class TouristService implements UserDetailsService {
 
-    @Autowired
-    private ModelMapper modelMapper;
+    private final TouristRepository repository;
+    private final ModelMapper mapper;
+    private final PasswordEncoder encoder;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-
-    public List<TouristDto> getAllUsers() {
-        List<Tourist> users = userRepository.findAll();
-        return modelMapper.map(users, new TypeToken<List<TouristDto>>() {}.getType());
+    public TouristService(TouristRepository repository, ModelMapper mapper, PasswordEncoder encoder) {
+        this.repository = repository;
+        this.mapper = mapper;
+        this.encoder = encoder;
     }
 
-    public TouristResponseDto saveTourist(TouristDto touristDto) {
-        Tourist user = modelMapper.map(touristDto, Tourist.class);
+    public TouristResponseDto saveTourist(TouristDto dto) {
 
-        if (touristDto.getDateOfBirth() != null && !touristDto.getDateOfBirth().isEmpty()) {
-            user.setDateOfBirth(LocalDate.parse(touristDto.getDateOfBirth()));
-        }
-        // Hash password before saving
-        user.setPassword(passwordEncoder.encode(touristDto.getPassword()));
+        Tourist user = mapper.map(dto, Tourist.class);
 
-        if (user.getCreatedAt() == null) {
-            user.setCreatedAt(LocalDateTime.now());
+        if (dto.getDateOfBirth() != null && !dto.getDateOfBirth().isEmpty()) {
+            user.setDateOfBirth(LocalDate.parse(dto.getDateOfBirth()));
         }
 
-        user = userRepository.save(user);
-        return modelMapper.map(user, TouristResponseDto.class);
+        user.setPassword(encoder.encode(dto.getPassword()));
+        user.setCreatedAt(LocalDateTime.now());
+
+        Tourist saved = repository.save(user);
+
+        return mapper.map(saved, TouristResponseDto.class);
     }
 
+    @Override
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        Tourist user = repository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
+        return org.springframework.security.core.userdetails.User
+                .withUsername(user.getEmail())
+                .password(user.getPassword())
+                .authorities("TOURIST")
+                .build();
+    }
 
+    public Tourist findByEmail(String email) {
+        return repository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+    }
 }
